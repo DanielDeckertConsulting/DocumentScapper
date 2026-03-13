@@ -1,0 +1,8 @@
+# Local overrides (optional: uncomment if you keep project-specific notes here)
+# .cursor/scratchpad.md
+
+# OS and editor
+.DS_Store
+*.swp
+*.swo
+Thumbs.db
