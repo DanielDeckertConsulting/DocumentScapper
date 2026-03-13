@@ -1,167 +1,188 @@
-# Cursor Project Template
+# DocumentScrapper
 
-This repository contains **Cursor configuration only**: rules, skills, agents, commands, and hooks. Use it as a template so any new project gets the same workflow, quality gates, and agent orchestration.
-
----
-
-## How to use this template
-
-1. **Create a new GitHub repo** (e.g. `my-new-app`) or use an existing empty repo.
-2. **Copy the `.cursor` folder** from this template into your project root:
-   - Clone this template repo, then copy its `.cursor` directory into your project, or
-   - Download the contents of this repo and place the `.cursor` folder in your project root.
-3. **In Cursor:** Open your project. Commands, rules, skills, and agents are loaded from `.cursor/`.
-4. **Optional:** Replace project name placeholders (e.g. "EasyHeadHunter") in `.cursor/commands/` and `.cursor/agents/` with your project name (search/replace).
-5. **Hooks:** If you use the stop-hook (`hooks.json` → `ops_orchestrator.ts`), ensure you have **Bun** installed and that `scripts/test.sh` exists when you run feature delivery (or adjust the hook to your test script).
+Ein Webprodukt zum Upload, zur automatischen Analyse und zum Chat mit Versicherungs- und Vertragsdokumenten.
 
 ---
 
-## What’s in `.cursor/`
+## Stack
 
-| Folder / file   | Purpose |
-|-----------------|--------|
-| `commands/`     | Chat commands you can run with `#command_name` (e.g. `#project_kickoff`, `#ship_feature`). |
-| `agents/`       | Agent definitions (e.g. Foundation Architect, DEV, PM, Review). Invoke via Cursor’s agent picker or @ mention. |
-| `rules/`        | Always-on rules (simplicity, no PII, event-log, backend/frontend, etc.). |
-| `skills/`       | Specialized skills (AC generator, scope-guard, event-schema-guard, GDPR scan, etc.) used by commands/agents. |
-| `hooks/`        | Optional stop-hook (`ops_orchestrator.ts`) for post-chat orchestration (e.g. run tests, suggest next steps). |
-| `hooks.json`    | Hook configuration (e.g. run `ops_orchestrator.ts` when a chat session stops). |
-| `scratchpad.md` | Used by orchestrator/commands to store mode, plan, and PR notes. |
-
----
-
-## Workflow: From idea to shipped feature
-
-When you have an **idea** or a **generated MVP specification**, follow these steps in order. Each step has a **command** to run in Cursor and an **example prompt** you can paste.
+| Schicht | Technologie |
+|---------|-------------|
+| Frontend | Vue 3 + TypeScript + Tailwind CSS |
+| Backend | Laravel 11 (PHP 8.3) |
+| Datenbank | PostgreSQL 16 |
+| Queue | Redis + Laravel Queue |
+| Storage | Lokal (Dev) / S3-kompatibel (Prod) |
+| AI | OpenAI API (GPT-4o-mini) |
 
 ---
 
-### Step 0 — Project Kickoff
+## Schnellstart (Lokal)
 
-**Goal:** Turn a raw product idea into a clear MVP specification and success criteria.
+### Voraussetzungen
 
-**Command:** `#project_kickoff`
+- PHP 8.3+ mit Composer
+- Node.js 20+
+- Docker + Docker Compose
 
-**Example prompt:**
+### 1. Infrastruktur starten
 
-```text
-Product idea: A small web app for therapists to write session notes and get AI-assisted summaries. Target users: solo practitioners. MVP success: they can create a note, get a one-paragraph summary, and export it as PDF. Constraints: German UI, must be deployable on a single server, no patient data in logs.
+```bash
+cd infra
+docker compose up -d
+```
+
+PostgreSQL läuft auf Port `5432`, Redis auf Port `6379`.
+
+### 2. Backend einrichten
+
+```bash
+cd api
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate
+```
+
+Für Development mit Testnutzer:
+
+```bash
+php artisan db:seed
+```
+
+Backend starten:
+
+```bash
+php artisan serve
+# Läuft auf http://localhost:8000
+```
+
+Queue Worker starten (separates Terminal):
+
+```bash
+php artisan queue:work
+```
+
+### 3. Frontend einrichten
+
+```bash
+cd web
+cp .env.example .env
+npm install
+npm run dev
+# Läuft auf http://localhost:5173
 ```
 
 ---
 
-### Step 1 — Feature Definition
+## Umgebungsvariablen
 
-**Goal:** Turn a feature idea into a single implementable ticket (scope, events, API, acceptance criteria).
+### Backend (`api/.env`)
 
-**Command:** `#new_feature`
+| Variable | Beschreibung |
+|----------|-------------|
+| `DB_*` | PostgreSQL Verbindung |
+| `REDIS_*` | Redis Verbindung |
+| `OPENAI_API_KEY` | OpenAI API Schlüssel (erforderlich für Extraktion + Chat) |
+| `OPENAI_MODEL_EXTRACTION` | Modell für Extraktion (default: gpt-4o-mini) |
+| `OPENAI_MODEL_CHAT` | Modell für Chat (default: gpt-4o-mini) |
+| `SANCTUM_STATEFUL_DOMAINS` | Frontend-Domain für Sanctum Cookie |
 
-**Example prompt:**
+### Frontend (`web/.env`)
 
-```text
-Feature: As a therapist I want to create a session note with title and body, so that I can store it and get an AI summary. Constraints: one note at a time for MVP; summary via existing LLM API; no PII in logs.
+| Variable | Beschreibung |
+|----------|-------------|
+| `VITE_API_URL` | URL des Laravel Backends |
+
+---
+
+## Tests
+
+```bash
+# Backend
+cd api && php artisan test
+
+# Frontend Build
+cd web && npm run build
 ```
 
 ---
 
-### Step 2 — Open Questions
+## Lokale Entwicklung
 
-**Goal:** Capture and track product, tech, and legal open questions so they can be resolved before or during implementation.
+Der Entwicklungsflow:
 
-**Command:** `#open_questions`
-
-**Example prompt:**
-
-```text
-Context: MVP scope from #project_kickoff (therapist session notes app). Create docs/OPEN_QUESTIONS.md with sections: Product & scope, Identity & auth, Compliance, Tech & ops. Propose 8–12 open questions and mark all as Open.
-```
+1. `docker compose up -d` (PostgreSQL + Redis)
+2. `php artisan serve` (Backend API)
+3. `php artisan queue:work` (Async-Verarbeitung)
+4. `npm run dev` (Frontend Dev-Server)
 
 ---
 
-### Step 3 — Architecture Blueprint
+## Upload-Flow
 
-**Goal:** Define initial architecture, tech stack, and repository blueprint before writing code.
-
-**Command:** `#architecture_blueprint` (and invoke the **Foundation Architect** agent when prompted)
-
-**Example prompt:**
-
-```text
-Using MVP from #project_kickoff: therapist session notes, AI summary, PDF export. Data sensitivity: PII in notes (we'll anonymize in logs). Scale: low (single server). Compliance: GDPR, 2-year retention. Produce architecture summary, tech stack, repo blueprint, NFRs, and ADR-0001/ADR-0002. Recommend next init command.
-```
-
----
-
-### Step 4 — Project Bootstrap
-
-**Goal:** Create the repo structure, event store, minimal backend/frontend, docs, and optional UI design system.
-
-**Commands (in order):**
-
-1. `#init_project` — Creates monorepo skeleton (backend FastAPI + Postgres/event store, frontend, shared, scripts, docs).
-2. `#init_docs_diagrams` — Creates `docs/diagrams/` with Mermaid templates (C4, flows, deployment).
-3. `#init_futuristic_ui` — Optional: design tokens and core UI primitives (dark theme, electric blue accent).
-
-**Example prompt for `#init_project`:**
-
-```text
-Bootstrap the project per the Foundation Architect blueprint: Event-Log-first, FastAPI backend, Postgres + Alembic, minimal frontend. Create folder structure, /health and /events API, in-memory fallback when DB unavailable, shared event schema, and docs (architecture, events, dev-process, testing). Run #init_futuristic_ui after the skeleton is in place.
-```
-
-**Example prompt for `#init_docs_diagrams`:**
-
-```text
-Initialize docs/diagrams with C4 context/container, golden-path sequence and eventflow, deployment sketch, and projection structure. Update docs/architecture.md and docs/events.md with links to these diagrams.
-```
+1. Nutzer wählt PDF in der UI aus (Dateiauswahl oder Drag & Drop)
+2. Datei wird per `POST /api/documents` (multipart/form-data) hochgeladen
+3. Backend validiert MIME-Typ, Dateiendung und Dateigröße (max 20 MB)
+4. Datei wird im Storage unter `documents/{user_id}/{uuid}.pdf` abgelegt
+5. Dokument-Record wird mit `status=uploaded` angelegt
+6. `ProcessDocumentJob` wird in die Queue gestellt
+7. Worker verarbeitet asynchron: Text-Extraktion → Klassifikation → Strukturextraktion → Chunking
+8. Status wird sichtbar aktualisiert: `uploaded → processing → processed/failed`
+9. Dokument-Detailseite zeigt extrahierte Felder nach erfolgter Verarbeitung
 
 ---
 
-### Step 5 — Vertical Slice (ship one feature)
+## Queue Worker
 
-**Goal:** Deliver one feature end-to-end: ticket → AC → manual test cases → DEV → unit tests → test automation → review → PM acceptance → diagram updates.
+Der Queue Worker muss separat gestartet werden, um PDF-Dokumente zu verarbeiten:
 
-**Commands:**
+```bash
+# Standard (verarbeitet alle Jobs)
+php artisan queue:work
 
-- **Standard (you choose gates):** `#ship_feature`
-- **Auto mode (picks standard vs healthcare by sensitivity):** `#ship_feature_auto`
-- **Healthcare / regulated:** `#ship_feature_healthcare`
+# Mit explizitem Queue-Namen und Retry-Limit
+php artisan queue:work --queue=default --tries=3
 
-**Example prompt for `#ship_feature`:**
-
-```text
-Feature: User can create a session note (title + body) and get an AI summary. Backend: POST /notes, GET /notes/:id, POST /notes/:id/summarize. Emit events: note.created, note.summary.requested, note.summary.completed. No PII in logs. Optional gates: DOCS.
+# Für Entwicklung (Fehler sofort sichtbar)
+php artisan queue:work --tries=1
 ```
 
-**Example prompt for `#ship_feature_auto`:**
-
-```text
-Feature: Export session note as PDF. Use existing note content; add a “Export PDF” button that calls backend and returns a PDF. No new PII; anonymization already applied. [No constraints.]
-```
+Ohne laufenden Worker werden Dokumente dauerhaft im Status `uploaded` verbleiben.
 
 ---
 
-## Quick reference: commands by step
+## Bekannte MVP-Limitierungen
 
-| Step | Command | Purpose |
-|------|---------|--------|
-| 0 | `#project_kickoff` | Idea → MVP spec |
-| 1 | `#new_feature` | Feature → single ticket (events, API, AC) |
-| 2 | `#open_questions` | Create/update `docs/OPEN_QUESTIONS.md` |
-| 3 | `#architecture_blueprint` + Foundation Architect | Architecture + tech stack + repo blueprint |
-| 4 | `#init_project` then `#init_docs_diagrams` then `#init_futuristic_ui` | Bootstrap repo + docs + UI |
-| 5 | `#ship_feature` or `#ship_feature_auto` or `#ship_feature_healthcare` | Deliver one vertical slice |
-
----
-
-## After copying: what you need in Cursor
-
-- **Nothing else required** for commands and rules; they load from `.cursor/`.
-- **Agents:** Ensure the agents under `.cursor/agents/` are available in your Cursor workspace (they usually are when the project is open).
-- **Hooks:** To use the stop-hook, install **Bun** and keep `scripts/test.sh` (or point the hook to your test script).
-- **Skills:** Referenced by commands/agents (e.g. AC generator, scope-guard); no extra setup beyond having the `.cursor/skills/` folder.
+1. **PDF only** — Nur text-basierte PDFs werden vollständig verarbeitet; kein DOCX/XLSX
+2. **Keine OCR** — Gescannte PDFs ohne Text-Layer werden mit `status=failed` markiert
+3. **Kein Chat in Phase 1.1** — Chat-Funktion folgt in Phase 1.2; CTA-Platzhalter ist sichtbar
+4. **Extraktion unvollständig möglich** — Nicht alle Felder werden immer gefunden; fehlende Felder sind `null`, nie halluziniert
+5. **Keine Account-Löschung** — Muss in Post-MVP implementiert werden
+6. **Single-Server-Deployment** — Kein Kubernetes/HA-Setup in MVP
+7. **OpenAI API erforderlich** — Ohne gültigen `OPENAI_API_KEY` schlägt die Verarbeitung fehl (Textextraktion funktioniert, Klassifikation + Strukturextraktion nicht)
 
 ---
 
-## License
+## Projektdokumentation
 
-Use and adapt this template for your own projects. No warranty.
+Alle Architekturdokumente liegen in `/docs`:
+
+| Dokument | Inhalt |
+|----------|--------|
+| `ARCHITECTURE.md` | Systemkontext, Building Blocks, C4-Diagramme |
+| `TECHSTACK.md` | Alle verwendeten Technologien |
+| `DATA_MODEL.md` | Datenbankschema, Ownership-Regeln |
+| `DOCUMENT_INGESTION_PIPELINE.md` | Verarbeitungspipeline, Job-Strategie |
+| `CHAT_RAG_ARCHITECTURE.md` | Chat, Retrieval, Prompt-Aufbau |
+| `SECURITY_AND_GDPR.md` | Auth, Isolation, DSGVO-Baseline |
+| `FRONTEND_ARCHITECTURE.md` | Vue-Struktur, Stores, Komponenten |
+| `MVP_SCOPE.md` | Was im/nicht im Scope ist |
+| `API_SPEC.md` | REST-Endpunkte, Request/Response-Formate |
+| `TEST_STRATEGY.md` | Teststrategie, kritische Pfade |
+
+---
+
+## Lizenz
+
+Proprietär — alle Rechte vorbehalten.

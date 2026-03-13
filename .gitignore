@@ -1,8 +1,43 @@
-# Local overrides (optional: uncomment if you keep project-specific notes here)
-# .cursor/scratchpad.md
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
 
-# OS and editor
+# Node
+node_modules/
+dist/
+.vite/
+
+# PHP / Composer
+vendor/
+api/vendor/
+
+# Laravel
+api/storage/app/private/
+api/storage/framework/cache/
+api/storage/framework/sessions/
+api/storage/framework/views/
+api/storage/logs/
+api/bootstrap/cache/*.php
+!api/storage/app/documents/.gitkeep
+!api/storage/logs/.gitkeep
+
+# Database
+*.sqlite
+*.sqlite3
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+.cursor/
 *.swp
 *.swo
-Thumbs.db
+
+# Test coverage
+coverage/
+.phpunit.cache/

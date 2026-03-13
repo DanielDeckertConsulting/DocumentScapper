@@ -1,0 +1,143 @@
+version: '3.9'
+
+# Full-Stack Docker Compose (alle Services)
+# Für Umgebungen ohne lokales PHP/Node
+#
+# Verwendung:
+#   cd infra
+#   APP_KEY=base64:... OPENAI_API_KEY=sk-... docker compose -f docker-compose.full.yml up --build
+#
+# APP_KEY generieren: docker run --rm php:8.3-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: documentscapper_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: documentscapper
+      POSTGRES_USER: documentscapper
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documentscapper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: documentscapper_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../api
+      dockerfile: ../infra/Dockerfile.api
+    container_name: documentscapper_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_NAME: DocumentScrapper
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: ${APP_KEY:-}
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: documentscapper
+      DB_USERNAME: documentscapper
+      DB_PASSWORD: secret
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      FILESYSTEM_DISK: local
+      DOCUMENT_STORAGE_DISK: local
+      SESSION_DRIVER: cookie
+      SESSION_DOMAIN: localhost
+      SANCTUM_STATEFUL_DOMAINS: localhost:5173,localhost:3000,localhost
+      FRONTEND_URL: http://localhost:5173
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-your_key_here}
+      OPENAI_MODEL_EXTRACTION: gpt-4o-mini
+      OPENAI_MODEL_CHAT: gpt-4o-mini
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: info
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+      - api_storage:/var/www/html/storage
+
+  worker:
+    build:
+      context: ../api
+      dockerfile: ../infra/Dockerfile.api
+    container_name: documentscapper_worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=300
+    environment:
+      APP_NAME: DocumentScrapper
+      APP_ENV: local
+      APP_KEY: ${APP_KEY:-}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: documentscapper
+      DB_USERNAME: documentscapper
+      DB_PASSWORD: secret
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      FILESYSTEM_DISK: local
+      DOCUMENT_STORAGE_DISK: local
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-your_key_here}
+      OPENAI_MODEL_EXTRACTION: gpt-4o-mini
+      OPENAI_MODEL_CHAT: gpt-4o-mini
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: info
+    volumes:
+      - ../api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+      - api_storage:/var/www/html/storage
+
+  web:
+    build:
+      context: ../web
+      dockerfile: ../infra/Dockerfile.web
+    container_name: documentscapper_web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
+  redis_data:
+  api_vendor:
+  api_storage:

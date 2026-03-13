@@ -1,0 +1,43 @@
+---
+title: Vue SPA — Komponentenstruktur (Phase 1.2)
+---
+graph TD
+    App["App.vue\n(RouterView)"]
+
+    App --> LP["LoginPage.vue"]
+    App --> DP["DocumentsPage.vue"]
+    App --> DDP["DocumentDetailPage.vue"]
+    App --> CP["ChatPage.vue"]
+    App --> NF["NotFoundPage.vue"]
+
+    %% Shared Layout
+    DP --> AH["AppHeader.vue\n(Logo + Logout + Breadcrumb-Slot)"]
+    DDP --> AH
+    CP --> AH
+
+    %% Common Components
+    DP --> AS["AppSpinner.vue"]
+    DP --> DSB["DocumentStatusBadge.vue"]
+    DDP --> AS2["AppSpinner.vue"]
+    DDP --> DSB2["DocumentStatusBadge.vue"]
+    CP --> AS3["AppSpinner.vue"]
+
+    %% Assets / Theme
+    AH --> LOGO["public/images/logo_2024.png\n(FINAS Logo)"]
+    App --> TW["assets/tailwind.css\n(@theme FINAS Design-Tokens)"]
+
+    %% Styling Tokens
+    TW --> TK1["--color-brand: #005d22"]
+    TW --> TK2["--color-brand-hover: #004a1b"]
+    TW --> TK3["--color-brand-soft: #e8f5ec"]
+    TW --> TK4["--color-surface / --color-border / ..."]
+
+    classDef page fill:#e8f5ec,stroke:#005d22,color:#003d16
+    classDef shared fill:#d1e7dd,stroke:#005d22,color:#003d16
+    classDef asset fill:#f8f9fa,stroke:#ced4da,color:#495057
+    classDef token fill:#fff3cd,stroke:#ffc107,color:#664d03
+
+    class LP,DP,DDP,CP,NF page
+    class AH,AS,AS2,AS3,DSB,DSB2 shared
+    class LOGO asset
+    class TW,TK1,TK2,TK3,TK4 token
