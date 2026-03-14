@@ -20,6 +20,7 @@ api/storage/framework/sessions/
 api/storage/framework/views/
 api/storage/logs/
 api/bootstrap/cache/*.php
+api/public/storage
 !api/storage/app/documents/.gitkeep
 !api/storage/logs/.gitkeep
 
